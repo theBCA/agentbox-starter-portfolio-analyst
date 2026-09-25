@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232962F6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3C/svg%3E">
+<!--
+  The application's own page, written for the people who show it.
+
+  One Play button, eight steps, one plain sentence per result, then a card that
+  sums up what AgentBox did. A step is a canned message sent through the
+  ordinary chat (`POST /process/stream`); the buttons and the chat box at the
+  bottom are the same pipe. The script -- the name, the steps, the sentence for
+  each outcome -- comes from `GET /concept`, so this file knows nothing about
+  which agent it fronts and is byte-identical across every starter.
+
+  Four rules, each with a reason:
+
+  1. ZERO external requests. No CDN, no analytics, and the two typefaces ship
+     in `fonts/` next to this file. A demo that needs the internet cannot be
+     given on a plane, in a locked-down customer network or on an air-gapped
+     install, which is where this product is most often shown.
+
+  2. The status pill is DERIVED, never configured. It comes from
+     `GET /runtime-info`, which reads what the platform actually put in this
+     container. There is no "demo mode" flag, because a page that could claim
+     to be protected would be worth nothing as evidence. Until that route
+     answers, no step may render green.
+
+  3. Every result sentence is looked up by SIGNAL, never by step. The page
+     decides from what came back -- the gateway's 403 code, the bridge's
+     approval id, the proxy's status, the guard's verdict -- and then reads
+     the sentence for that signal out of the concept. A refusal is the
+     control doing its job and renders green; a control that BROKE renders
+     grey and is never counted.
+
+  4. Plain words only. Nothing here says connector, MCP, tool, skill, DLP,
+     egress, gateway, hold, model or provider; a test greps this file and the
+     concept for that list. Every string a person sees is either in the
+     concept or in the TEXT block at the top of the script.
+-->
+<style>
+  @font-face { font-family: "Instrument Sans"; font-weight: 600; font-style: normal; font-display: swap; src: url(fonts/InstrumentSans-600.woff2) format("woff2"); }
+  @font-face { font-family: "Instrument Sans"; font-weight: 700; font-style: normal; font-display: swap; src: url(fonts/InstrumentSans-700.woff2) format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 400; font-style: normal; font-display: swap; src: url(fonts/Inter-400.woff2) format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 500; font-style: normal; font-display: swap; src: url(fonts/Inter-500.woff2) format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 600; font-style: normal; font-display: swap; src: url(fonts/Inter-600.woff2) format("woff2"); }
+
+  :root {
+    /* Signal, light. One step darker than the admin console's badge colours
+       on purpose: this page is read on a projector, and every text/fill pair
+       below clears 4.5:1. Light is the only theme -- the page has to look the
+       same on every machine it is shown from. */
+    --bg: #F4F7FD; --surface: #FFFFFF; --text: #172033; --muted: #5B6472;
+    --border: #E4E4E7; --hair: #F1F1F3; --dash: #D4D4D8;
+    --brand: #2962F6; --brand-ink: #1E3FB8; --brand-wash: #EAF0FF; --ring: rgba(41,98,246,.14);
+    --user-fill: #EEF3FC; --user-border: #DCE4FB;
+    --ok-text: #15803D; --ok-fill: #DCFCE7; --ok-ink: #14532D;
+    --warn-text: #B45309; --warn-fill: #FEF3C7; --warn-ink: #78350F;
+    --bad-text: #B91C1C; --bad-fill: #FEE2E2; --bad-ink: #7F1D1D;
+    --info-text: #1D4ED8; --info-fill: #DBEAFE;
+    --neutral-text: #3F3F46; --neutral-fill: #F4F4F5; --neutral-dot: #A1A1AA;
+    --shadow: 0 1px 2px rgba(0,0,0,.06); --shadow-step: 0 1px 2px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  /* A window-high shell: the header, the Ask box and the footer stay put, and the step
+     list and the answer scroll on their own. With min-height the page grew with a long
+     answer, the answer ran under the Ask box, and the whole page scrolled away. */
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+  h1, h2, h3 { font-family: "Instrument Sans", Inter, system-ui, sans-serif; letter-spacing: -.01em; margin: 0; font-weight: 700; }
+  p { margin: 0; }
+  button, textarea { font: inherit; }
+  .vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+  :focus-visible { outline: 3px solid var(--ring); outline-offset: 1px; }
+  .ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 12px 28px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .mark { width: 40px; height: 40px; border-radius: 11px; background: var(--brand-wash); color: var(--brand-ink); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .mark .ic { width: 20px; height: 20px; }
+  .title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .title h1 { font-size: 19px; }
+  .title span { font-size: 13px; color: var(--muted); }
+  .topbar .right { margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+  .pill { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .pill.ok { background: var(--ok-fill); color: var(--ok-text); }
+  .pill.warn { background: var(--warn-fill); color: var(--warn-text); }
+  .pill.bad { background: var(--bad-fill); color: var(--bad-text); }
+  .pill.neutral { background: var(--neutral-fill); color: var(--neutral-text); }
+  .pill.muted { background: var(--neutral-fill); color: var(--muted); font-weight: 500; }
+  .pill.sm { height: 22px; padding: 0 9px; font-size: 11.5px; }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: #09090B; font-weight: 600; font-size: 13.5px; white-space: nowrap; box-shadow: var(--shadow); cursor: pointer; appearance: none; }
+  .btn:hover { border-color: #B9C7F5; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-ink); border-color: var(--brand-ink); }
+  .btn.ghost { border-color: transparent; box-shadow: none; background: transparent; color: var(--muted); font-weight: 500; }
+  .btn:disabled { opacity: .55; cursor: default; }
+
+  .body { display: grid; grid-template-columns: 400px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 22px; padding: 16px 28px 14px; flex: 1; min-height: 0; }
+  .left { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding: 2px 4px 2px 2px; }
+  .left h2 { font-size: 16px; }
+  .sub { font-size: 12.5px; color: var(--muted); }
+  .playrow { display: flex; gap: 8px; align-items: center; margin-bottom: 2px; }
+
+  .step { all: unset; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 0 11px; align-items: center; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: left; box-shadow: var(--shadow-step); box-sizing: border-box; width: 100%; }
+  .step:hover { border-color: #B9C7F5; }
+  .step:focus-visible { outline: 3px solid var(--ring); }
+  .step.on { border-color: var(--brand); box-shadow: 0 0 0 3px var(--ring); }
+  .step.done { background: #FAFAFA; }
+  .step.running .n { border-color: var(--brand); color: var(--brand); }
+  .step .n { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--dash); display: inline-flex; align-items: center; justify-content: center; font: 600 12.5px "Instrument Sans", Inter, system-ui, sans-serif; color: var(--muted); background: var(--surface); }
+  .step.on .n { border-color: var(--brand); color: var(--brand); }
+  .step.done .n { background: var(--text); border-color: var(--text); color: #fff; }
+  .step.done .n .ic { width: 12px; height: 12px; stroke-width: 3; }
+  .step b { display: block; font-weight: 600; font-size: 13.5px; color: var(--text); line-height: 1.3; }
+  .step .s { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; line-height: 1.35; }
+
+  .rightcol { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .pane { display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 6px 2px 2px; }
+  .stephead { display: flex; align-items: center; gap: 10px; }
+  .stephead h2 { font-size: 16px; }
+  .lbl { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .turn { display: flex; flex-direction: column; gap: 6px; }
+  .bubble { border-radius: 14px; padding: 14px 18px; font-size: 15px; line-height: 1.6; max-width: 700px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bubble.user { background: var(--user-fill); color: var(--text); border: 1px solid var(--user-border); }
+  .bubble.agent { background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow-step); }
+  .bubble.note { background: var(--neutral-fill); color: var(--neutral-text); border: 1px dashed var(--dash); font-size: 14px; }
+  /* An answer is rendered Markdown, not raw text: `**bold**` and `## heading` used to show as typed. */
+  .bubble.md { white-space: normal; }
+  .bubble.md > :first-child { margin-top: 0; } .bubble.md > :last-child { margin-bottom: 0; }
+  .bubble.md p { margin: 0 0 10px; }
+  .bubble.md h3, .bubble.md h4 { font-size: 15.5px; margin: 14px 0 6px; }
+  .bubble.md ul, .bubble.md ol { margin: 0 0 10px; padding-left: 22px; }
+  .bubble.md li { margin: 3px 0; }
+  .bubble.md code { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--neutral-fill); border-radius: 5px; padding: 1px 5px; }
+  .bubble.md pre { margin: 0 0 10px; padding: 10px 12px; background: var(--neutral-fill); border-radius: 8px; overflow-x: auto; }
+  .bubble.md pre code { background: none; padding: 0; white-space: pre; }
+  .bubble.md a { color: var(--brand-ink); }
+  .thinking { color: var(--muted); font-weight: 400; }
+  .toolline { font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; padding-left: 4px; }
+  .toolline .ic { width: 13px; height: 13px; }
+  /* A value AgentBox tokenized: the model saw a placeholder, the reader sees what kind
+     of value it was and its last digits, never the token id. */
+  .vault { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border-radius: 999px; background: var(--ok-fill); color: var(--ok-ink); font-size: 0.92em; font-weight: 600; white-space: nowrap; }
+  .vault .ic { width: 12px; height: 12px; }
+  .vaultnote { display: flex; gap: 10px; align-items: flex-start; border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.5; max-width: 700px; background: var(--ok-fill); color: var(--ok-ink); }
+  .vaultnote .ic { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+  .vaultnote b { display: block; }
+
+  .result { display: flex; gap: 14px; align-items: center; border-radius: 12px; padding: 14px 18px; font-size: 14.5px; line-height: 1.5; max-width: 700px; }
+  .result.ok { background: var(--ok-fill); color: var(--ok-ink); }
+  .result.warn { background: var(--warn-fill); color: var(--warn-ink); }
+  .result.bad { background: var(--bad-fill); color: var(--bad-ink); }
+  .result.neutral { background: var(--neutral-fill); color: var(--neutral-text); }
+  .result .ic { width: 22px; height: 22px; }
+  .result .pill { margin-left: auto; background: var(--surface); }
+  .result.ok .pill { color: var(--ok-text); } .result.warn .pill { color: var(--warn-text); } .result.bad .pill { color: var(--bad-text); } .result.neutral .pill { color: var(--neutral-text); }
+  /* Capped like the messages, so "Next step" sits under the conversation, not at the window's far edge. */
+  .nextrow { margin-top: auto; display: flex; align-items: center; gap: 10px; justify-content: flex-end; max-width: 700px; width: 100%; }
+
+  .intro { border: 1px dashed var(--dash); border-radius: 14px; padding: 40px 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; color: var(--muted); background: var(--surface); flex: 1; }
+  .intro .ic { width: 34px; height: 34px; color: var(--brand); }
+  .intro h3 { font-size: 20px; color: var(--text); }
+  .intro p { max-width: 48ch; font-size: 14.5px; }
+
+  .score { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow-step); max-width: 760px; }
+  .score h3 { font-size: 19px; }
+  .score .li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 0 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+  .score .li:last-child { border-bottom: 0; }
+  .score .li i { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-style: normal; }
+  .score .li i.ok { background: var(--ok-text); } .score .li i.warn { background: var(--warn-text); } .score .li i.bad { background: var(--bad-text); } .score .li i.neutral, .score .li i.muted { background: var(--neutral-dot); }
+  .score .li i .ic { width: 12px; height: 12px; stroke-width: 3; }
+  .score .li .k { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+  .score .foot { display: flex; align-items: center; gap: 12px; padding-top: 6px; border-top: 1px solid var(--hair); font-size: 13.5px; color: var(--text); flex-wrap: wrap; }
+  .score .foot .btn { margin-left: auto; }
+
+  .composer { flex: none; display: flex; gap: 8px; align-items: flex-end; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 8px 8px 8px 14px; box-shadow: var(--shadow-step); max-width: 700px; }
+  .composer textarea { flex: 1; border: 0; resize: none; padding: 6px 0; min-height: 40px; max-height: 140px; outline: none; background: transparent; color: var(--text); font-size: 14.5px; line-height: 1.5; }
+  .composer textarea::placeholder { color: var(--muted); }
+  .composer textarea:disabled { color: var(--muted); }
+
+  .foot { padding: 9px 28px; border-top: 1px solid var(--border); background: var(--surface); font-size: 12.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .foot .ic.ok { color: var(--ok-text); } .foot .ic.warn { color: var(--warn-text); } .foot .ic.bad { color: var(--bad-text); } .foot .ic.neutral { color: var(--neutral-dot); }
+  .foot .right { margin-left: auto; }
+
+  @media (max-width: 900px) {
+    body { height: auto; min-height: 100vh; overflow: visible; }
+    .body { grid-template-columns: 1fr; grid-template-rows: none; padding: 14px 16px; }
+    .left, .pane { overflow: visible; }
+    .topbar, .foot { padding-left: 16px; padding-right: 16px; }
+    .bubble, .result, .score, .composer { max-width: none; }
+    /* The page scrolls here, and the Ask box would sit at the very end of
+       it. Keep it on screen while the answer above it is read. */
+    .composer { position: sticky; bottom: 10px; z-index: 2; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="mark" id="mark" aria-hidden="true"></span>
+  <div class="title"><h1 id="name">Agent</h1><span id="tagline"></span></div>
+  <div class="right">
+    <span class="pill muted" id="builtWith" hidden></span>
+    <span class="pill neutral" id="status"></span>
+  </div>
+</header>
+
+<main class="body">
+  <section class="left" aria-labelledby="showme">
+    <div><h2 id="showme">Show me</h2><span class="sub">Eight steps. Click one, or press Play and they run in order.</span></div>
+    <div class="playrow">
+      <button class="btn primary" type="button" id="play"></button>
+      <button class="btn ghost" type="button" id="startOver" hidden>Start over</button>
+    </div>
+    <div id="steps" class="left" role="list"></div>
+  </section>
+
+  <section class="rightcol">
+    <div id="pane" class="pane" aria-live="polite"></div>
+    <form class="composer" id="composer">
+      <label for="ask" class="vh">Ask the agent</label>
+      <textarea id="ask" rows="1" placeholder="Ask the agent anything, or pick one of the steps…"></textarea>
+      <button class="btn primary" type="submit" id="askBtn">Ask</button>
+    </form>
+  </section>
+</main>
+
+<footer class="foot">
+  <span id="footIcon" aria-hidden="true"></span>
+  <span id="footText"></span>
+  <span class="right">Sample data. Nobody here is a real customer.</span>
+</footer>
+
+<script>
+(function () {
+'use strict';
+
+/* TEXT-BEGIN -- every string a person sees that is not in the concept. */
+var TEXT = {
+  status: { yes: 'Protected by AgentBox', partly: 'Partly protected', no: 'Not protected', unknown: 'Couldn’t read this app’s status' },
+  builtWith: 'Built with ',
+  via: ', via ',
+  frameworks: { claude: 'Claude', openai: 'OpenAI', 'google-adk': 'Google ADK', openclaw: 'OpenClaw' },
+  providers: { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google', openrouter: 'OpenRouter' },
+  nativeProvider: { claude: 'anthropic', openai: 'openai', 'google-adk': 'google' },
+  foot: {
+    yes: 'This window runs inside AgentBox. The window next to it is the same kind of app running on its own.',
+    no: 'This window runs on its own, the way most agents run today. Same job, same buttons, nothing between the agent and the world.',
+    partly: 'This window runs inside AgentBox, but not everything is switched on: ',
+    unknown: 'This app did not say whether it is protected, so nothing on this page can be shown as checked.'
+  },
+  missing: {
+    secureproxy: 'AI calls are not going through AgentBox',
+    egress: 'going online is not being checked',
+    mcp_bridge: 'your systems are reached without AgentBox',
+    package_guard: 'software is not being checked in this window',
+    file_guard: 'the agent’s notes are not being watched',
+    skills: 'house rules are not coming from AgentBox',
+    tls: 'secure connections are not being verified'
+  },
+  play: { first: 'Play in order', next: 'Play next', retry: 'Approved, try again', seeProtected: 'See what AgentBox did', seeUnprotected: 'See what happened', again: 'Play again' },
+  nextStep: 'Next step',
+  intro: { title: 'Press Play, or pick a step', protectedText: 'Each step sends a real message to the agent. You see the message, the agent’s answer, and one line on what AgentBox did about it. At the end, the whole picture.', unprotectedText: 'Each step sends a real message to the agent. You see the message, the agent’s answer, and one line on what the app did about it. At the end, the whole picture.' },
+  stepOf: 'Step {n} of {total}',
+  you: 'You',
+  vault: {
+    kinds: { IBAN: 'IBAN', CREDIT_CARD: 'card', SSN: 'ID number', PHONE_NUMBER: 'phone number', EMAIL: 'email' },
+    ending: '{kind} ending {last}',
+    email: 'email {hint}',
+    chipTitle: 'Protected by AgentBox: the AI model saw only a placeholder, never this value.',
+    title: 'Protected by AgentBox',
+    one: 'The {value} was replaced by a placeholder before the AI model saw it.',
+    many: 'These were replaced by placeholders before the AI model saw them: {list}.',
+    rest: 'The real value stays in AgentBox’s vault, and only a tool an administrator allowed ever receives it.'
+  },
+  yourQuestion: 'Your question',
+  thinking: 'thinking…',
+  waitingFor: { tool_held: 'waiting for a manager', tool_denied: 'not allowed', egress_blocked: 'site not on the list', egress_ok: 'done', pkg_block: 'refused', pkg_hold: 'waiting for an operator', pkg_allow: 'installed', note_quarantined: 'quarantined', note_kept: 'kept', tool_ok: 'done', failed: 'failed' },
+  notes: {
+    blocked_injection: 'This message was not passed to the AI.',
+    blocked_sensitive: 'This message was not passed to the AI: it carried personal data.'
+  },
+  /* A question typed into the box is not one of the scripted steps, so the
+     steps' own sentences (the news item, the ticket, the hidden text) would
+     describe something that did not happen. These cover the outcomes a free
+     question can have; everything else still comes from the app's script. */
+  free: {
+    ok: { word: 'Checked', tone: 'ok', text: 'Answered through AgentBox. Nothing sensitive in the question, so nothing to remove.' },
+    redacted: { word: 'Removed', tone: 'ok', text: 'AgentBox removed {names} before the AI saw your question. The agent still answered.' },
+    blocked_sensitive: { word: 'Stopped', tone: 'ok', text: 'Your question carried personal data, so AgentBox kept it from the AI.' },
+    blocked_injection: { word: 'Stopped', tone: 'ok', text: 'AgentBox read an instruction in this request that tried to steer the agent, so it never reached the AI.' },
+    tokenized: { word: 'Protected', tone: 'ok', text: 'AgentBox replaced personal data with a placeholder before the AI saw it. The agent still answered.' }
+  },
+  failedWord: 'Failed',
+  failedDefault: 'This step could not be completed.',
+  notRun: 'not run',
+  unknownGuard: 'This app did not say whether it is protected, so this cannot be shown as checked. ',
+  noConcept: 'This app did not hand over its script (GET /concept failed), so there are no steps to play. The chat box still works.',
+  score: {
+    protectedTitle: 'What AgentBox did while you watched',
+    protectedSub: 'Eight steps, eight decisions. The agent did its job the whole time.',
+    protectedFoot: 'All of it is on record in the admin console: who asked, what happened, when.',
+    openConsole: 'Open the admin console',
+    unprotectedTitle: 'What happened while you watched',
+    unprotectedSub: 'Eight steps. The agent did what it was told, every time, by anyone.',
+    unprotectedFoot: 'There is no record of any of this. Nobody was asked, nothing was checked, and it would look exactly the same tomorrow.'
+  },
+  counts: {
+    ok: '{n} answered', redacted: '', blocked_sensitive: '{n} message', blocked_injection: '{n} message',
+    tool_ok: '{n} request', tool_held: '{n} waiting', tool_denied: '{n} refused',
+    egress_blocked: '{n} refused', egress_ok: '{n} allowed',
+    pkg_block: '{n} refused', pkg_hold: '{n} waiting', pkg_allow: '{n} installed',
+    note_quarantined: '{n} quarantined', note_kept: '{n} kept',
+    key_absent: '{n} pass', key_present: '{n} key', failed: 'failed'
+  },
+  names: { credit_card: 'card', iban: 'account number', ssn: 'ID number', phone_number: 'phone number', pem_private_key: 'private key', email: 'email address' },
+  keyNoneAtAll: 'This app holds no AI key and no AgentBox pass, so it cannot reach the AI at all.'
+};
+/* TEXT-END */
+
+var ICONS = {
+  ticket: '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>',
+  'trending-up': '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  scale: '<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  minus: '<path d="M5 12h14"/>',
+  external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  dot: '<circle cx="12" cy="12" r="3"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+};
+
+/* Which signal wins when a run produced several. A pause or a refusal is the
+ * story of the step; a success that also happened is not. */
+var PRIORITY = ['tool_held', 'pkg_hold', 'egress_blocked', 'pkg_block', 'tool_denied', 'note_quarantined', 'failed', 'egress_ok', 'pkg_allow', 'note_kept', 'tool_ok'];
+var TONE_ICON = { ok: 'shield', warn: 'clock', bad: 'alert', neutral: 'help' };
+
+function $(sel, root) { return (root || document).querySelector(sel); }
+function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+/* Markdown for an agent's answer, built from DOM nodes and textContent only -- the
+   model's text is never parsed as HTML. Headings, lists, fenced code, paragraphs,
+   **bold**, *italic*, `code` and http(s) links; anything else stays plain text. */
+/* A tokenized value, as the vault writes it: `[IBAN DE89…3000 · tok_…]`. The model
+   keeps the placeholder; the page shows a chip ("IBAN ending 3000") instead of the
+   raw marker, and says under the answer what happened. */
+var VAULT_RE = /\[([A-Z_]+) ([^\[\]·]{1,40}) · tok_[0-9a-f]{24}\]/g;
+function vaultLabel(kind, hint) {
+  /* An email keeps its first letter and its domain ("email m…@example.com"). */
+  if (kind === 'EMAIL') return TEXT.vault.email.replace('{hint}', String(hint));
+  var k = TEXT.vault.kinds[kind] || String(kind).replace(/_/g, ' ').toLowerCase();
+  return TEXT.vault.ending.replace('{kind}', k).replace('{last}', String(hint).split('…').pop());
+}
+function vaultValues(text) {
+  var out = [], seen = {}, re = new RegExp(VAULT_RE.source, 'g'), m;
+  while ((m = re.exec(String(text || '')))) { var l = vaultLabel(m[1], m[2]); if (!seen[l]) { seen[l] = true; out.push(l); } }
+  return out;
+}
+function vaultChip(kind, hint) {
+  var chip = el('span', 'vault'); chip.title = TEXT.vault.chipTitle;
+  chip.appendChild(svg('lock')); chip.appendChild(document.createTextNode(vaultLabel(kind, hint)));
+  return chip;
+}
+function vaultNote(values) {
+  var note = el('div', 'vaultnote'); note.appendChild(svg('lock'));
+  var body = el('div'); body.appendChild(el('b', null, TEXT.vault.title));
+  var said = values.length === 1 ? TEXT.vault.one.replace('{value}', values[0]) : TEXT.vault.many.replace('{list}', values.join(', '));
+  body.appendChild(el('span', null, said + ' ' + TEXT.vault.rest));
+  note.appendChild(body); return note;
+}
+function inlineMd(parent, text) {
+  var re = new RegExp(VAULT_RE.source, 'g'), last = 0, m;
+  while ((m = re.exec(text))) { inlineText(parent, text.slice(last, m.index)); parent.appendChild(vaultChip(m[1], m[2])); last = m.index + m[0].length; }
+  inlineText(parent, text.slice(last));
+}
+function inlineText(parent, text) {
+  /* Emphasis markers left unpaired (`***+2.1%**`, a lone `**`) are dropped rather
+     than shown: the reader asked for a chat, not for the model's asterisks. */
+  function plain(t) { return document.createTextNode(t.replace(/\*{2,}/g, '')); }
+  var re = /(\*\*[^*\n]+\*\*|`[^`\n]+`|\[[^\]\n]+\]\(https?:\/\/[^)\s]+\)|(?:^|[^*\w])\*[^*\s][^*\n]*\*(?!\w))/g;
+  var last = 0, m;
+  while ((m = re.exec(text))) {
+    var tok = m[0], lead = '';
+    if (tok[0] !== '*' && tok[0] !== '`' && tok[0] !== '[') { lead = tok[0]; tok = tok.slice(1); }
+    parent.appendChild(plain(text.slice(last, m.index) + lead));
+    if (tok.slice(0, 2) === '**') parent.appendChild(el('strong', null, tok.slice(2, -2).replace(/\*+/g, '')));
+    else if (tok[0] === '`') parent.appendChild(el('code', null, tok.slice(1, -1)));
+    else if (tok[0] === '[') { var lm = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(tok); var a = el('a', null, lm[1]); a.href = lm[2]; a.target = '_blank'; a.rel = 'noopener noreferrer'; parent.appendChild(a); }
+    else parent.appendChild(el('em', null, tok.slice(1, -1)));
+    last = m.index + m[0].length;
+  }
+  parent.appendChild(plain(text.slice(last)));
+}
+function renderMd(text) {
+  var box = el('div', 'bubble agent md');
+  var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  var list = null, para = null, i = 0;
+  function close() { list = null; para = null; }
+  while (i < lines.length) {
+    var line = lines[i];
+    if (/^\s*```/.test(line)) {
+      close(); var code = []; i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) { code.push(lines[i]); i++; }
+      var pre = el('pre'); pre.appendChild(el('code', null, code.join('\n'))); box.appendChild(pre); i++; continue;
+    }
+    var h = /^\s{0,3}(#{1,6})\s+(.*)$/.exec(line);
+    var ul = /^\s*[-*•]\s+(.*)$/.exec(line);
+    var ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+    if (!line.trim()) close();
+    else if (h) { close(); var hn = el(h[1].length <= 2 ? 'h3' : 'h4'); inlineMd(hn, h[2]); box.appendChild(hn); }
+    else if (ul || ol) {
+      var tag = ul ? 'ul' : 'ol';
+      if (!list || list.tagName.toLowerCase() !== tag) { para = null; list = el(tag); box.appendChild(list); }
+      var li = el('li'); inlineMd(li, (ul || ol)[1]); list.appendChild(li);
+    } else if (list && /^\s{2,}\S/.test(line)) { list.lastChild.appendChild(document.createTextNode(' ')); inlineMd(list.lastChild, line.trim()); }
+    else {
+      list = null;
+      if (!para) { para = el('p'); box.appendChild(para); } else para.appendChild(el('br'));
+      inlineMd(para, line);
+    }
+    i++;
+  }
+  if (!box.childNodes.length) box.appendChild(document.createTextNode('…'));
+  return box;
+}
+function svg(name, cls) {
+  var t = document.createElement('template');
+  t.innerHTML = '<svg class="ic' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.dot) + '</svg>';
+  return t.content.firstChild;
+}
+function fill(template, n) { return template.replace('{n}', String(n)); }
+
+/* ---------------------------------------------------------------- state */
+var S = { concept: null, conceptError: '', posture: null, postureError: '', steps: [], current: null, free: null, score: false, running: false };
+
+/* ------------------------------------------------------------- posture */
+function postureState() {
+  var p = S.posture;
+  if (!p || !p.controls) return 'unknown';
+  var observable = p.controls.filter(function (c) { return c.wired === true || c.wired === false; });
+  var wired = observable.filter(function (c) { return c.wired === true; });
+  if (!observable.length) return 'unknown';
+  if (wired.length === observable.length) return 'yes';
+  if (!wired.length) return 'no';
+  return 'partly';
+}
+function isProtected() { var s = postureState(); return s === 'yes' || s === 'partly'; }
+function missingControls() {
+  if (!S.posture || !S.posture.controls) return [];
+  return S.posture.controls.filter(function (c) { return c.wired === false && TEXT.missing[c.id]; }).map(function (c) { return TEXT.missing[c.id]; });
+}
+/* What the app is built with, and honestly through whom: the framework, plus
+ * the route to the AI when it is not the framework's own vendor (the ADK app
+ * reaches its AI through OpenRouter, and says so). Both come from
+ * /runtime-info, never from this file. */
+function builtWithLabel() {
+  var p = S.posture || {};
+  var agent = String(p.agent_type || '').toLowerCase();
+  var provider = String(p.provider || '').toLowerCase();
+  if (!agent && !provider) return '';
+  var name = TEXT.frameworks[agent] || (agent ? agent.charAt(0).toUpperCase() + agent.slice(1) : '');
+  var providerName = TEXT.providers[provider] || (provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : '');
+  if (!name) return TEXT.builtWith + providerName;
+  if (provider && provider !== TEXT.nativeProvider[agent]) return TEXT.builtWith + name + TEXT.via + providerName;
+  return TEXT.builtWith + name;
+}
+
+async function loadPosture() {
+  try {
+    var r = await fetch('runtime-info', { headers: { accept: 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    S.posture = await r.json(); S.postureError = '';
+  } catch (err) {
+    S.posture = null; S.postureError = String(err && err.message || err);
+  }
+  renderChrome();
+  if (!S.running) { renderSteps(); renderPane(); }
+}
+
+async function loadConcept() {
+  try {
+    var r = await fetch('concept', { headers: { accept: 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    S.concept = await r.json(); S.conceptError = '';
+    S.steps = (S.concept.steps || []).map(function (def) { return { def: def, status: 'idle', run: null, outcome: null }; });
+    document.title = S.concept.name || document.title;
+  } catch (err) {
+    S.concept = null; S.conceptError = String(err && err.message || err); S.steps = [];
+  }
+  renderChrome(); renderSteps(); renderPlay(); renderPane();
+}
+
+/* --------------------------------------------------------------- chrome */
+function renderChrome() {
+  var c = S.concept || {};
+  $('#name').textContent = c.name || 'Agent';
+  $('#tagline').textContent = c.tagline || '';
+  var mark = $('#mark'); mark.innerHTML = ''; mark.appendChild(svg(c.icon || 'ticket'));
+
+  var state = postureState();
+  var tone = { yes: 'ok', partly: 'warn', no: 'bad', unknown: 'neutral' }[state];
+  var status = $('#status');
+  status.className = 'pill ' + tone; status.innerHTML = '';
+  status.appendChild(svg(TONE_ICON[tone])); status.appendChild(document.createTextNode(TEXT.status[state]));
+
+  var built = $('#builtWith'); var label = builtWithLabel();
+  built.hidden = !label; built.textContent = label;
+
+  var fi = $('#footIcon'); fi.innerHTML = ''; fi.appendChild(svg(TONE_ICON[tone], tone));
+  var ft = TEXT.foot[state];
+  if (state === 'partly') ft += missingControls().join('; ') + '.';
+  $('#footText').textContent = ft;
+}
+
+/* ---------------------------------------------------------------- steps */
+function renderSteps() {
+  var box = $('#steps'); box.innerHTML = '';
+  S.steps.forEach(function (step, i) {
+    var b = el('button', 'step'); b.type = 'button'; b.setAttribute('role', 'listitem');
+    if (S.current === i) b.classList.add('on');
+    if (step.status === 'done' && S.current !== i) b.classList.add('done');
+    if (step.status === 'done') b.classList.add('done');
+    if (step.status === 'running') b.classList.add('running');
+    var n = el('span', 'n');
+    if (step.status === 'done') n.appendChild(svg('check')); else n.textContent = String(i + 1);
+    var mid = el('span'); mid.appendChild(el('b', null, step.def.title)); mid.appendChild(el('span', 's', step.def.sub || ''));
+    var right = el('span');
+    if (step.status === 'done' && step.outcome) right.appendChild(el('span', 'pill sm ' + step.outcome.tone, step.outcome.word));
+    b.appendChild(n); b.appendChild(mid); b.appendChild(right);
+    b.addEventListener('click', function () { if (!S.running) runStep(i); });
+    b.disabled = S.running;
+    box.appendChild(b);
+  });
+}
+
+function renderPlay() {
+  var play = $('#play'), over = $('#startOver');
+  var started = S.steps.some(function (s) { return s.status !== 'idle'; }) || S.free || S.score;
+  over.hidden = !started;
+  var cur = (typeof S.current === 'number') ? S.steps[S.current] : null;
+  var waiting = cur && cur.status === 'done' && cur.outcome && cur.outcome.tone === 'warn';
+  var doneCount = S.steps.filter(function (s) { return s.status === 'done'; }).length;
+  var nextIdx = -1;
+  for (var i = 0; i < S.steps.length; i++) { if (S.steps[i].status !== 'done') { nextIdx = i; break; } }
+  var label, icon, action;
+  if (!S.steps.length) { label = TEXT.play.first; icon = 'play'; action = null; }
+  else if (S.score) { label = TEXT.play.again; icon = 'refresh'; action = reset; }
+  else if (waiting) { label = TEXT.play.retry; icon = 'play'; action = function () { runStep(S.current); }; }
+  else if (nextIdx === -1) { label = isProtected() ? TEXT.play.seeProtected : TEXT.play.seeUnprotected; icon = 'play'; action = showScore; }
+  else { label = doneCount ? TEXT.play.next : TEXT.play.first; icon = 'play'; action = function () { runStep(nextIdx); }; }
+  play.innerHTML = ''; play.appendChild(svg(icon)); play.appendChild(document.createTextNode(label));
+  play.onclick = action; play.disabled = S.running || !action;
+  over.disabled = S.running;
+  $('#askBtn').disabled = S.running; $('#ask').disabled = S.running;
+}
+
+function reset() {
+  S.steps.forEach(function (s) { s.status = 'idle'; s.run = null; s.outcome = null; });
+  S.current = null; S.free = null; S.score = false;
+  renderSteps(); renderPlay(); renderPane();
+}
+function showScore() { S.score = true; S.current = null; renderSteps(); renderPlay(); renderPane(); revealPane(); }
+
+/* On a narrow screen the steps stack above the answer, so starting one changed
+   nothing the reader could see: the step turned "Checked" and the answer
+   arrived below the fold (measured at 390 px, 2026-09-24). Bring the answer
+   column into view; on a wide screen it is already beside the steps. */
+function revealPane() {
+  if (!window.matchMedia || !window.matchMedia('(max-width: 900px)').matches) return;
+  var col = document.querySelector('.rightcol');
+  if (col && col.scrollIntoView) col.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* --------------------------------------------------------------- running */
+async function runStep(i) {
+  var step = S.steps[i];
+  if (!step || S.running) return;
+  S.score = false; S.current = i; S.free = null;
+  step.status = 'running'; step.run = newRun(step.def.prompt); step.outcome = null;
+  S.running = true;
+  renderSteps(); renderPlay(); renderPane(); revealPane();
+  await streamInto(step.run, function () { renderPane(); });
+  step.outcome = derive(step.def, step.run);
+  step.status = 'done'; S.running = false;
+  renderSteps(); renderPlay(); renderPane();
+}
+
+async function runFree(text) {
+  if (S.running) return;
+  S.score = false; S.current = 'free';
+  S.free = { def: { title: TEXT.yourQuestion, who: TEXT.you, prompt: text, expects: [], free: true }, status: 'running', run: newRun(text), outcome: null };
+  S.running = true;
+  renderSteps(); renderPlay(); renderPane(); revealPane();
+  await streamInto(S.free.run, function () { renderPane(); });
+  S.free.outcome = derive(S.free.def, S.free.run);
+  S.free.status = 'done'; S.running = false;
+  renderSteps(); renderPlay(); renderPane();
+}
+
+function newRun(prompt) { return { prompt: prompt, answer: '', result: '', tools: [], error: null }; }
+
+function parseFrame(frame) {
+  var event = 'message', data = [];
+  frame.split('\n').forEach(function (line) {
+    if (line.indexOf('event:') === 0) event = line.slice(6).trim();
+    else if (line.indexOf('data:') === 0) data.push(line.slice(5).trim());
+  });
+  if (!data.length) return null;
+  try { return { event: event, data: JSON.parse(data.join('\n')) }; }
+  catch (_) { return { event: event, data: { text: data.join('\n') } }; }
+}
+
+/* SSE over POST, so not EventSource. Everything the page later decides comes
+ * out of these frames: `token`/`result` are the agent's words, `tool` and
+ * `tool_result` are what it did and what the platform said about it, and a
+ * terminal `error` carries the gateway's own code when a request was
+ * refused before the AI saw it. */
+async function streamInto(run, onUpdate) {
+  var response;
+  try {
+    response = await fetch('process/stream', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input: run.prompt })
+    });
+  } catch (err) {
+    run.error = { status: 0, detail: String(err && err.message || err) }; onUpdate(run); return run;
+  }
+  if (!response.ok || !response.body) {
+    var detail = '';
+    try { var payload = await response.json(); detail = payload && (payload.detail || payload.error) || ''; } catch (_) { /* no body */ }
+    run.error = { status: response.status, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) || ('HTTP ' + response.status) };
+    onUpdate(run); return run;
+  }
+  var reader = response.body.getReader(), decoder = new TextDecoder(), buffer = '';
+  function handle(p) {
+    if (!p) return;
+    var d = p.data || {};
+    if (p.event === 'token') run.answer += d.text || '';
+    else if (p.event === 'tool') run.tools.push({ id: d.id || '', name: d.name || 'tool', input: d.input || {}, signal: null });
+    else if (p.event === 'tool_result') {
+      var t = null;
+      for (var i = 0; i < run.tools.length; i++) { if (!run.tools[i].signal && (run.tools[i].id === d.id || run.tools[i].name === d.name)) { t = run.tools[i]; break; } }
+      if (!t) { t = { id: d.id || '', name: d.name || 'tool', input: {} }; run.tools.push(t); }
+      t.signal = d.signal || 'failed'; t.ok = !!d.ok; t.detail = d.detail || ''; t.approval_id = d.approval_id || ''; t.data = d.data || {};
+    }
+    else if (p.event === 'result') run.result = d.text || '';
+    else if (p.event === 'error') run.error = { status: d.status || 500, detail: d.detail || '' };
+    onUpdate(run);
+  }
+  for (;;) {
+    var chunk = await reader.read();
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
+    var frames = buffer.split('\n\n'); buffer = frames.pop();
+    frames.forEach(function (f) { handle(parseFrame(f)); });
+  }
+  if (buffer.trim()) handle(parseFrame(buffer));
+  if (run.result) run.answer = run.result;
+  return run;
+}
+
+/* --------------------------------------------------------- derivation */
+function redactions(text) {
+  var out = [], re = /\[REDACTED:([a-z0-9_]+)\]/gi, m;
+  while ((m = re.exec(text || ''))) out.push(m[1].toLowerCase());
+  return out;
+}
+function nameList(names) {
+  var counts = {};
+  names.forEach(function (n) { var label = TEXT.names[n] || n.replace(/_/g, ' '); counts[label] = (counts[label] || 0) + 1; });
+  return Object.keys(counts).map(function (k) { return counts[k] + ' ' + k + (counts[k] > 1 && !/s$/.test(k) ? 's' : ''); }).join(', ');
+}
+function controlWired(id) {
+  if (!S.posture || !S.posture.controls) return null;
+  var row = S.posture.controls.filter(function (c) { return c.id === id; })[0];
+  return row ? row.wired : null;
+}
+
+/* Signal -> key -> sentence. The key is decided from what came back, never
+ * from which step was pressed; the side (protected / unprotected) is decided
+ * from the posture, and flipped for one step when its own signal says the
+ * control was not there (an install nothing evaluated, a post that went
+ * straight out, a real key in the environment). */
+function derive(def, run) {
+  var side = isProtected() ? 'protected' : 'unprotected';
+  var key = 'ok', note = '', failedText = '', names = [];
+  if (run.error) {
+    var d = String(run.error.detail || '');
+    if (run.error.status === 403 && /prompt_injection/i.test(d)) { key = 'blocked_injection'; note = TEXT.notes.blocked_injection; }
+    else if (run.error.status === 403 && /sensitive_data|blocked/i.test(d)) { key = 'blocked_sensitive'; note = TEXT.notes.blocked_sensitive; }
+    else { key = 'failed'; failedText = d || ('HTTP ' + run.error.status); }
+  } else if ((def.expects || []).indexOf('key_absent') >= 0 || (def.expects || []).indexOf('key_present') >= 0) {
+    if (postureState() === 'unknown') { key = 'failed'; failedText = TEXT.foot.unknown; }
+    else {
+      var raw = (S.posture.raw_provider_keys || []);
+      if (raw.length) { key = 'key_present'; side = 'unprotected'; }
+      else if (controlWired('secureproxy') === true) key = 'key_absent';
+      else { key = 'failed'; failedText = TEXT.keyNoneAtAll; }
+    }
+  } else {
+    names = redactions(run.answer);
+    var signals = run.tools.map(function (t) { return t.signal; });
+    var hit = pickSignal(signals, def.expects || []);
+    if (names.length) key = 'redacted';
+    else if (hit) {
+      key = hit;
+      var t = run.tools.filter(function (x) { return x.signal === hit; })[0];
+      if (t && t.data && (t.data.governed === false || t.data.proxied === false || t.data.watched === false)) side = 'unprotected';
+      if (hit === 'failed') failedText = t && t.detail || '';
+    }
+    /* A plain success that carried a vault placeholder -- in the answer, or in
+       what a tool was given -- is the tokenization story, not a routine read.
+       A held call stays "Waiting": that is the step's own news. */
+    if ((key === 'ok' || key === 'tool_ok') && carriesVaultValue(run)) key = 'tokenized';
+  }
+  var s = sentence(key, side, names, failedText, def.free, def);
+  if (postureState() === 'unknown' && key !== 'failed') { s.tone = 'neutral'; s.text = TEXT.unknownGuard + s.text; }
+  return { key: key, side: side, word: s.word, tone: s.tone, text: s.text, note: note, names: names };
+}
+
+/* The step's own topic outranks an incidental call. "Add software" on the
+   unguarded twin installed the package, then also tried a website with a bad
+   address, and the page said "Failed" (measured 2026-09-25). A signal in the
+   step's family -- the prefix of what it expects: pkg_, egress_, tool_,
+   note_ -- is chosen first, in PRIORITY order; a step with none of them, and a
+   free question, fall back to every signal as before. */
+function pickSignal(signals, expects) {
+  var families = expects.map(function (e) { return e.split('_')[0] + '_'; });
+  var inFamily = signals.filter(function (s) { return families.some(function (f) { return s.indexOf(f) === 0; }); });
+  var pool = inFamily.length ? inFamily : signals;
+  for (var i = 0; i < PRIORITY.length; i++) { if (pool.indexOf(PRIORITY[i]) >= 0) return PRIORITY[i]; }
+  return null;
+}
+
+/* A placeholder the agent handed to a tool counts as much as one it wrote in
+   the answer: the refund step's answer often says only "done", while the
+   placeholder went to issue_refund (measured 2026-09-25). */
+function runVaultText(run) {
+  var inputs = run.tools.map(function (t) { return JSON.stringify(t.input || {}); }).join(' ');
+  return String(run.answer || '') + ' ' + inputs;
+}
+function carriesVaultValue(run) { return vaultValues(runVaultText(run)).length > 0; }
+function sentence(key, side, names, failedText, free, def) {
+  if (key === 'failed') return { word: TEXT.failedWord, tone: 'neutral', text: failedText || TEXT.failedDefault };
+  /* A step may word its own outcomes (the refund step's "Waiting" is not the
+     purge step's); the concept's shared sentences are the fallback. */
+  var own = (def && def.results) || {};
+  var results = (S.concept && S.concept.results) || {};
+  var entry = (free && side === 'protected' && TEXT.free[key]) || (own[key] || {})[side] || (results[key] || {})[side] || (results[key] || {}).protected;
+  if (!entry) return { word: side === 'protected' ? 'Checked' : 'Not checked', tone: side === 'protected' ? 'ok' : 'bad', text: '' };
+  var text = String(entry.text || '');
+  if (names && names.length) text = text.replace('{names}', nameList(names));
+  return { word: entry.word, tone: entry.tone, text: text };
+}
+
+function countFor(step) {
+  var o = step.outcome; if (!o) return TEXT.notRun;
+  if (o.key === 'redacted') return nameList(o.names);
+  var n = 1;
+  if (o.key === 'tool_ok') n = step.run.tools.filter(function (t) { return t.signal === 'tool_ok'; }).length || 1;
+  var t = TEXT.counts[o.key] || '';
+  if (!t) return '';
+  var out = fill(t, n);
+  return n > 1 ? out.replace(/(request|message|pass|key)$/, '$1s') : out;
+}
+
+/* ----------------------------------------------------------------- pane */
+function toolLabel(name) {
+  var labels = (S.concept && S.concept.tool_labels) || {};
+  return labels[name] || String(name || '').replace(/_/g, ' ');
+}
+
+function renderPane() {
+  var pane = $('#pane');
+  /* The pane is rebuilt on every streamed token. Keep the reader's place, and follow
+     the answer down while it streams unless they scrolled up to read. */
+  var atBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 40;
+  var keep = pane.scrollTop;
+  renderPaneBody(pane);
+  var running = S.running || (S.free && S.free.status === 'running');
+  pane.scrollTop = running && atBottom ? pane.scrollHeight : keep;
+}
+function renderPaneBody(pane) {
+  pane.innerHTML = '';
+  if (S.score) { pane.appendChild(scorecard()); return; }
+  var cur = S.current === 'free' ? S.free : (typeof S.current === 'number' ? S.steps[S.current] : null);
+  if (!cur) {
+    var intro = el('div', 'intro');
+    intro.appendChild(svg('play'));
+    intro.appendChild(el('h3', null, TEXT.intro.title));
+    intro.appendChild(el('p', null, S.conceptError ? TEXT.noConcept : (isProtected() ? TEXT.intro.protectedText : TEXT.intro.unprotectedText)));
+    pane.appendChild(intro); return;
+  }
+  var def = cur.def, run = cur.run, agentName = (S.concept && S.concept.name) || 'Agent';
+
+  var head = el('div', 'stephead');
+  if (typeof S.current === 'number') head.appendChild(el('span', 'sub', TEXT.stepOf.replace('{n}', String(S.current + 1)).replace('{total}', String(S.steps.length))));
+  head.appendChild(el('h2', null, def.title));
+  pane.appendChild(head);
+
+  var user = el('div', 'turn'); user.appendChild(el('span', 'lbl', def.who || TEXT.you)); user.appendChild(el('div', 'bubble user', def.prompt)); pane.appendChild(user);
+
+  var refused = run.error && run.error.status === 403 && cur.status === 'done' && cur.outcome && cur.outcome.note;
+  if (refused) {
+    var note = el('div', 'turn'); note.appendChild(el('span', 'lbl', agentName)); note.appendChild(el('div', 'bubble note', cur.outcome.note)); pane.appendChild(note);
+  } else if (run.answer || cur.status === 'running') {
+    var agent = el('div', 'turn');
+    var lbl = el('span', 'lbl', agentName);
+    if (cur.status === 'running') { lbl.appendChild(document.createTextNode(' · ')); lbl.appendChild(el('span', 'thinking', TEXT.thinking)); }
+    agent.appendChild(lbl);
+    agent.appendChild(renderMd(run.answer || '…'));
+    pane.appendChild(agent);
+    var protectedValues = cur.status === 'running' ? [] : vaultValues(runVaultText(run));
+    if (protectedValues.length) pane.appendChild(vaultNote(protectedValues));
+  }
+
+  run.tools.forEach(function (t) {
+    var line = el('div', 'toolline');
+    line.appendChild(svg(t.signal ? (t.ok ? 'check' : (t.signal === 'tool_held' || t.signal === 'pkg_hold' ? 'clock' : 'x')) : 'dot'));
+    var status = t.signal ? (TEXT.waitingFor[t.signal] || '') : '';
+    line.appendChild(document.createTextNode(toolLabel(t.name) + (status ? ' · ' + status : '')));
+    pane.appendChild(line);
+  });
+
+  if (cur.status === 'done' && cur.outcome) {
+    var o = cur.outcome;
+    var strip = el('div', 'result ' + o.tone);
+    strip.appendChild(svg(TONE_ICON[o.tone]));
+    strip.appendChild(el('span', null, o.text));
+    strip.appendChild(el('span', 'pill sm', o.word));
+    pane.appendChild(strip);
+    if (typeof S.current === 'number') {
+      var row = el('div', 'nextrow');
+      var last = S.current === S.steps.length - 1;
+      var nb = el('button', 'btn'); nb.type = 'button';
+      nb.appendChild(document.createTextNode(last ? (isProtected() ? TEXT.play.seeProtected : TEXT.play.seeUnprotected) : TEXT.nextStep));
+      nb.appendChild(svg('arrow'));
+      nb.addEventListener('click', function () { if (last) showScore(); else runStep(S.current + 1); });
+      row.appendChild(nb); pane.appendChild(row);
+    }
+  }
+}
+
+function scorecard() {
+  var prot = isProtected();
+  var c = S.concept || {}; var rows = (c.scorecard || {})[prot ? 'protected' : 'unprotected'] || [];
+  var card = el('div', 'score');
+  var head = el('div'); head.appendChild(el('h3', null, prot ? TEXT.score.protectedTitle : TEXT.score.unprotectedTitle)); head.appendChild(el('span', 'sub', prot ? TEXT.score.protectedSub : TEXT.score.unprotectedSub)); card.appendChild(head);
+  var list = el('div');
+  rows.forEach(function (row) {
+    var step = S.steps.filter(function (s) { return s.def.scorecard === row.key; })[0];
+    var li = el('div', 'li');
+    var tone = 'muted', icon = 'minus', k = TEXT.notRun;
+    if (step && step.outcome) {
+      tone = prot ? step.outcome.tone : 'bad';
+      if (step.outcome.side === 'unprotected') tone = 'bad';
+      icon = tone === 'ok' ? 'check' : tone === 'warn' ? 'clock' : tone === 'bad' ? 'x' : 'minus';
+      k = countFor(step);
+    }
+    var dot = el('i', tone); dot.appendChild(svg(icon)); li.appendChild(dot);
+    li.appendChild(el('span', null, row.text)); li.appendChild(el('span', 'k', k));
+    list.appendChild(li);
+  });
+  card.appendChild(list);
+  var foot = el('div', 'foot');
+  foot.appendChild(el('span', null, prot ? TEXT.score.protectedFoot : TEXT.score.unprotectedFoot));
+  var url = S.posture && (S.posture.admin_console_url || S.posture.console_url);
+  if (prot && url) {
+    var b = el('button', 'btn'); b.type = 'button'; b.appendChild(document.createTextNode(TEXT.score.openConsole)); b.appendChild(svg('external'));
+    b.addEventListener('click', function () { window.open(String(url), '_blank', 'noopener'); });
+    foot.appendChild(b);
+  }
+  card.appendChild(foot);
+  return card;
+}
+
+/* ------------------------------------------------------------- wiring */
+$('#startOver').addEventListener('click', function () { if (!S.running) reset(); });
+$('#composer').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var box = $('#ask'); var text = box.value.trim();
+  if (!text || S.running) return;
+  box.value = '';
+  runFree(text);
+});
+$('#ask').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#composer').requestSubmit(); }
+});
+
+renderChrome(); renderPlay(); renderPane();
+loadConcept();
+loadPosture();
+setInterval(loadPosture, 30000);
+})();
+</script>
+</body>
+</html>
