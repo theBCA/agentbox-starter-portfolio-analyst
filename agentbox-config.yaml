@@ -1,0 +1,79 @@
+# AgentBox application config.
+#
+# AgentBox reads this file from your repository root, by this exact name
+# (plan 0.2.2 slice 2e). It was `app-config.example.yaml` and read by nothing
+# at all -- `agentbox app add --config` was deleted with the `app` command
+# group in phase 5, and until slice 2e no code path opened an application's
+# config file. What it declares now takes precedence over AgentBox's own
+# heuristics; anything it omits is guessed from your source and shown for
+# confirmation on the onboarding form, where you can override either one.
+#
+# Unrecognised keys are reported as warnings rather than ignored, so a typo
+# tells you instead of silently doing nothing.
+name: portfolio-analyst
+# The provider SecureProxy routes this app's model calls to. Empty or
+# absent means this agent type's native default, which is what this
+# is -- change it to `openrouter` to route the same code elsewhere
+# without touching the code.
+preferred_provider: openai
+port: 8081
+health_endpoint: /health
+# The OpenAPI 3.x document describing the routes above, relative to this
+# repository root. This is what turns on the admin console's "Try API" button
+# for this application: the button is gated on the document actually PARSING
+# (`api_doc_status == "ok"`), not on this field merely being set, so a path
+# that cannot be read leaves the button hidden rather than opening a console
+# with nothing behind it.
+#
+# It is read statically out of this source tree and never fetched, so it has
+# to be a committed file -- pointing this at a framework's runtime
+# `/openapi.json` names a path that does not exist here and reads as
+# `missing`.
+# Hand-maintained: express emits no OpenAPI document of its own, so a new
+# route needs a matching entry in `openapi.json` --
+# `test_starter_app_api_doc.py` fails if the two disagree.
+api_doc: openapi.json
+agent_type: openai
+runtime_agentic_files: /home/agent/agent-state
+runtime_skills: /home/agent/skills
+# Deny by default: the app reaches only what is named here (plan 0.2.2i).
+#
+# The package registries are NOT listed and must not be -- SecureProxy
+# evaluates `system_allow_domains` before this list, and Package Guard's baseline
+# already carries pypi.org, files.pythonhosted.org and registry.npmjs.org. An
+# app can therefore install its dependencies without an operator naming a
+# registry, which is what makes a deny-by-default posture workable.
+#
+# The LLM vendor is NOT listed either, and must not be. The SDK is handed a
+# SecureProxy base URL and reaches the model through SecureProxy on this
+# app's own network, which is not egress and needs no entry. Naming the
+# vendor here would ALLOW the app to dial it directly -- the exact drift a
+# dependency update can cause, and what Hardening Check's
+# `hardening_check.egress.<host>_reachable` finding exists to catch -- so
+# provisioning removes such an entry every time
+# (`harden_egress_for_agent_type`: a whitelist naming an upstream is
+# narrowed, never widened). An earlier revision of this file
+# listed it anyway; measured 2026-09-10, the entry was stripped on every
+# single provision.
+#
+# So the list ships EMPTY, which is not a placeholder: with the baseline
+# above it is a complete, working posture. Add a destination when your app
+# genuinely calls a third-party API of its own. Entries may be domains,
+# wildcard domains (*.example.com), IPs or CIDRs (34.1.2.3, 34.1.2.0/24), or
+# URL prefixes (https://api.example.com/v1/*), e.g.:
+#
+#   network_destination_list:
+#     - api.stripe.com
+#     - "*.internal.example"
+# The app's OpenAPI 3.x document, relative to this repository root
+# (plan 0.2.5). AgentBox parses it at ONBOARDING -- a broken document is
+# an onboarding warning, not a dead panel later -- and the admin console
+# offers this app's API console only when it parses. Absent means no
+# console is offered at all. Point it at a generated file if your
+# framework emits one; FastAPI serves /openapi.json for free.
+#
+# It is NOT authorization: a route absent from the document still exists
+# and the console's relay can still reach it. The document drives what
+# the UI offers, never what the relay permits.
+network_mode: whitelist
+network_destination_list: []
