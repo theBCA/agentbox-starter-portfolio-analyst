@@ -1,0 +1,2 @@
+# ToolAnnotations (the read-only hint on get_positions) needs a 2025 release.
+mcp>=1.10,<2

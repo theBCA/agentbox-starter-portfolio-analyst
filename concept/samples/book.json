@@ -1,0 +1,285 @@
+{
+  "accounts": [
+    {
+      "id": "ACC-4471",
+      "client": "M. Lindqvist",
+      "status": "active",
+      "benchmark": "MSCI Europe (net)",
+      "period": "2026-Q3",
+      "portfolio_return_pct": 2.1,
+      "benchmark_return_pct": 3.4,
+      "last_activity": "2026-09-19",
+      "positions": [
+        {
+          "ticker": "NOVO-B.CO",
+          "name": "Novo Nordisk",
+          "weight_pct": 24.0,
+          "period_return_pct": 5.1,
+          "currency": "DKK",
+          "sector": "Health care"
+        },
+        {
+          "ticker": "EQNR.OL",
+          "name": "Equinor",
+          "weight_pct": 6.0,
+          "period_return_pct": 9.2,
+          "currency": "NOK",
+          "sector": "Energy"
+        },
+        {
+          "ticker": "NOD.OL",
+          "name": "Nordic Semiconductor",
+          "weight_pct": 9.0,
+          "period_return_pct": -12.4,
+          "currency": "NOK",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "ASML.AS",
+          "name": "ASML",
+          "weight_pct": 8.0,
+          "period_return_pct": -3.1,
+          "currency": "EUR",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "SAP.DE",
+          "name": "SAP",
+          "weight_pct": 7.0,
+          "period_return_pct": 2.4,
+          "currency": "EUR",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "NESN.SW",
+          "name": "Nestle",
+          "weight_pct": 7.0,
+          "period_return_pct": 1.1,
+          "currency": "CHF",
+          "sector": "Consumer staples"
+        },
+        {
+          "ticker": "VOLV-B.ST",
+          "name": "Volvo",
+          "weight_pct": 5.0,
+          "period_return_pct": 3.8,
+          "currency": "SEK",
+          "sector": "Industrials"
+        },
+        {
+          "ticker": "SIE.DE",
+          "name": "Siemens",
+          "weight_pct": 7.0,
+          "period_return_pct": 0.6,
+          "currency": "EUR",
+          "sector": "Industrials"
+        },
+        {
+          "ticker": "ERIC-B.ST",
+          "name": "Ericsson",
+          "weight_pct": 4.0,
+          "period_return_pct": -6.5,
+          "currency": "SEK",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "DNB.OL",
+          "name": "DNB",
+          "weight_pct": 6.0,
+          "period_return_pct": 2.9,
+          "currency": "NOK",
+          "sector": "Financials"
+        },
+        {
+          "ticker": "IAG.L",
+          "name": "Ashtead",
+          "weight_pct": 3.0,
+          "period_return_pct": 4.4,
+          "currency": "GBP",
+          "sector": "Industrials"
+        },
+        {
+          "ticker": "CASH",
+          "name": "Cash",
+          "weight_pct": 14.0,
+          "period_return_pct": 0.9,
+          "currency": "EUR",
+          "sector": "Cash"
+        }
+      ]
+    },
+    {
+      "id": "ACC-4412",
+      "client": "J. Weber",
+      "status": "active",
+      "benchmark": "MSCI Europe (net)",
+      "period": "2026-Q3",
+      "portfolio_return_pct": 3.0,
+      "benchmark_return_pct": 3.4,
+      "last_activity": "2026-09-10",
+      "positions": [
+        {
+          "ticker": "NOVO-B.CO",
+          "name": "Novo Nordisk",
+          "weight_pct": 24.0,
+          "period_return_pct": 5.1,
+          "currency": "DKK",
+          "sector": "Health care"
+        },
+        {
+          "ticker": "EQNR.OL",
+          "name": "Equinor",
+          "weight_pct": 6.0,
+          "period_return_pct": 9.2,
+          "currency": "NOK",
+          "sector": "Energy"
+        },
+        {
+          "ticker": "NOD.OL",
+          "name": "Nordic Semiconductor",
+          "weight_pct": 9.0,
+          "period_return_pct": -12.4,
+          "currency": "NOK",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "ASML.AS",
+          "name": "ASML",
+          "weight_pct": 8.0,
+          "period_return_pct": -3.1,
+          "currency": "EUR",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "SAP.DE",
+          "name": "SAP",
+          "weight_pct": 7.0,
+          "period_return_pct": 2.4,
+          "currency": "EUR",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "NESN.SW",
+          "name": "Nestle",
+          "weight_pct": 7.0,
+          "period_return_pct": 1.1,
+          "currency": "CHF",
+          "sector": "Consumer staples"
+        }
+      ]
+    },
+    {
+      "id": "ACC-3980",
+      "client": "A. Kaya",
+      "status": "active",
+      "benchmark": "MSCI World (net)",
+      "period": "2026-Q3",
+      "portfolio_return_pct": 4.2,
+      "benchmark_return_pct": 4.0,
+      "last_activity": "2026-08-30",
+      "positions": [
+        {
+          "ticker": "NOD.OL",
+          "name": "Nordic Semiconductor",
+          "weight_pct": 9.0,
+          "period_return_pct": -12.4,
+          "currency": "NOK",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "ASML.AS",
+          "name": "ASML",
+          "weight_pct": 8.0,
+          "period_return_pct": -3.1,
+          "currency": "EUR",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "SAP.DE",
+          "name": "SAP",
+          "weight_pct": 7.0,
+          "period_return_pct": 2.4,
+          "currency": "EUR",
+          "sector": "Technology"
+        },
+        {
+          "ticker": "NESN.SW",
+          "name": "Nestle",
+          "weight_pct": 7.0,
+          "period_return_pct": 1.1,
+          "currency": "CHF",
+          "sector": "Consumer staples"
+        },
+        {
+          "ticker": "VOLV-B.ST",
+          "name": "Volvo",
+          "weight_pct": 5.0,
+          "period_return_pct": 3.8,
+          "currency": "SEK",
+          "sector": "Industrials"
+        },
+        {
+          "ticker": "SIE.DE",
+          "name": "Siemens",
+          "weight_pct": 7.0,
+          "period_return_pct": 0.6,
+          "currency": "EUR",
+          "sector": "Industrials"
+        },
+        {
+          "ticker": "ERIC-B.ST",
+          "name": "Ericsson",
+          "weight_pct": 4.0,
+          "period_return_pct": -6.5,
+          "currency": "SEK",
+          "sector": "Technology"
+        }
+      ]
+    },
+    {
+      "id": "ACC-2210",
+      "client": "T. Becker",
+      "status": "closed",
+      "benchmark": "MSCI Europe (net)",
+      "period": "2019-Q4",
+      "portfolio_return_pct": 0.0,
+      "benchmark_return_pct": 0.0,
+      "last_activity": "2019-11-02",
+      "positions": []
+    },
+    {
+      "id": "ACC-2044",
+      "client": "P. Nair",
+      "status": "closed",
+      "benchmark": "MSCI Europe (net)",
+      "period": "2018-Q2",
+      "portfolio_return_pct": 0.0,
+      "benchmark_return_pct": 0.0,
+      "last_activity": "2018-05-14",
+      "positions": []
+    },
+    {
+      "id": "ACC-1978",
+      "client": "L. Nilsen",
+      "status": "closed",
+      "benchmark": "MSCI World (net)",
+      "period": "2020-Q1",
+      "portfolio_return_pct": 0.0,
+      "benchmark_return_pct": 0.0,
+      "last_activity": "2020-02-27",
+      "positions": []
+    },
+    {
+      "id": "ACC-4502",
+      "client": "S. Rossi",
+      "status": "closed",
+      "benchmark": "MSCI Europe (net)",
+      "period": "2026-Q1",
+      "portfolio_return_pct": 0.0,
+      "benchmark_return_pct": 0.0,
+      "last_activity": "2026-03-31",
+      "positions": []
+    }
+  ],
+  "watchlist": []
+}

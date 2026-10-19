@@ -1,0 +1,13 @@
+account,ticker,name,weight_pct,period_return_pct,currency,sector
+ACC-4471,NOVO-B.CO,Novo Nordisk,24.0,5.1,DKK,Health care
+ACC-4471,EQNR.OL,Equinor,6.0,9.2,NOK,Energy
+ACC-4471,NOD.OL,Nordic Semiconductor,9.0,-12.4,NOK,Technology
+ACC-4471,ASML.AS,ASML,8.0,-3.1,EUR,Technology
+ACC-4471,SAP.DE,SAP,7.0,2.4,EUR,Technology
+ACC-4471,NESN.SW,Nestle,7.0,1.1,CHF,Consumer staples
+ACC-4471,VOLV-B.ST,Volvo,5.0,3.8,SEK,Industrials
+ACC-4471,SIE.DE,Siemens,7.0,0.6,EUR,Industrials
+ACC-4471,ERIC-B.ST,Ericsson,4.0,-6.5,SEK,Technology
+ACC-4471,DNB.OL,DNB,6.0,2.9,NOK,Financials
+ACC-4471,IAG.L,Ashtead,3.0,4.4,GBP,Industrials
+ACC-4471,CASH,Cash,14.0,0.9,EUR,Cash
